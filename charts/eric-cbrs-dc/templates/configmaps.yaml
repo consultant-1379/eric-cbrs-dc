@@ -1,0 +1,49 @@
+{{- if .Values.deploymentConfig.sharedResources.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-gp
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+data:
+  global.properties: |
+    DDC_ON_CLOUD=TRUE
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-gp-pg-pass
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+data:
+  global.properties: |
+    postgresql01_admin_password={{ .Values.techDebt.enmProperties.postgresql01_admin_password }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-pg-key
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+data:
+  postgresql01_passkey: |
+    5EacabwlanIHjZ8XAkoPIA==
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-dcm-host
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+data:
+  DCM_HOST: {{ .Values.DCM_HOST }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-load-balancer-ip
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+data:
+  CBRS_LOAD_BALANCER_IP: {{ .Values.CBRS_LOAD_BALANCER.loadBalancerIP | default "Not Assigned" }}
+{{- end }}

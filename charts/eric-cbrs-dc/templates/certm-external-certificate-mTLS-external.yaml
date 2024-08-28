@@ -1,0 +1,14 @@
+{{ if .Values.deploymentConfig.sharedResources.enabled }}
+{{- if (((.Values.global).security).tls).enabled }}
+apiVersion: certm.sec.ericsson.com/v1
+kind: ExternalCertificate
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-server-tls-certificate-and-key
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+spec:
+  generated-secret-name: {{ template "eric-cbrs-dc.name" . }}-server-tls-certificate-and-key
+  generated-secret-type: tls
+  asymmetric-key-certificate-name: {{ .Values.externalCertificateMTLS.certificates.asymmetricKeyCertificateName }}/{{ .Values.externalCertificateMTLS.certificates.trustedCertificateListName }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,26 @@
+global:
+  pullSecret: armdocker
+  timezone: Europe/Dublin
+  networkPolicy:
+    enabled: true
+
+# eric-cbrs-dc
+techDebt:
+  enmProperties:
+    postgresql01_admin_password: U2FsdGVkX19uWU+/kfu7jHGmy9BQdkr1Wz7pcHG56M8=
+
+# This should be updated to use 6443 in openstack
+service:
+  kubernetesApiPort: 60443
+
+# dependencies-chart
+eric-data-document-database-pg:
+  persistentVolumeClaim:
+    storageClassName: network-block
+
+secrets:
+  doc_db_credentials:
+    super_pwd: P0stgreSQL11
+  
+jbossLogging:
+  directory: /ericsson/3pp/jboss/standalone/log/

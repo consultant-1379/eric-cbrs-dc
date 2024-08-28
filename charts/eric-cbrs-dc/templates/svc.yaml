@@ -1,0 +1,52 @@
+{{- if .Values.deploymentConfig.sharedResources.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.service-annotations-merged" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.internalService.type }}
+{{- if .Values.global }}
+  {{- if .Values.global.internalIPFamily }}
+  ipFamilies: [{{ .Values.global.internalIPFamily | quote }}]
+  {{- end }}
+{{- end }}
+  ports:
+    - name: ingress-port
+    {{- if (((.Values.global).security).tls).enabled }}
+      port: {{ .Values.service.ingressPort }}
+    {{- else }}
+      port: {{ .Values.service.jbossPort }}
+    {{- end }}
+    - name: jboss-internal
+      port: {{ .Values.service.jbossInternalPort }}
+      targetPort: jboss-port
+  selector:
+    ericsson.com/eric-cbrs-dc: {{ include "eric-cbrs-dc.name" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-akka
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+spec:
+  type: ClusterIP
+{{- if .Values.global }}
+  {{- if .Values.global.internalIPFamily }}
+  ipFamilies: [{{ .Values.global.internalIPFamily | quote }}]
+  {{- end }}
+{{- end }}
+  ports:
+    - name: akka-mgmt
+      port: {{ .Values.service.akkaManagementPort }}
+      targetPort: akka-mgmt-port
+    - name: akka-probing
+      port: {{ .Values.service.akkaProbingPort }}
+      targetPort: akka-probe-port
+  selector:
+    ericsson.com/eric-cbrs-dc: {{ include "eric-cbrs-dc.name" . }}
+  clusterIP: None
+  publishNotReadyAddresses: true
+{{- end }}

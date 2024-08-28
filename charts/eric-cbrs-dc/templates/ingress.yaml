@@ -1,0 +1,23 @@
+{{ if .Values.deploymentConfig.sharedResources.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.ingress-tls-annotations-merged" . | nindent 4 }}
+spec:
+{{- if (.Values.ingress).ingressClass }}
+  ingressClassName: {{ .Values.ingress.ingressClass }}
+{{- end }}
+  rules:
+    - host: eric-cbrs-dc-sa-hostname.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ template "eric-cbrs-dc.name" . }}
+                port:
+                  name: ingress-port
+{{- end }}

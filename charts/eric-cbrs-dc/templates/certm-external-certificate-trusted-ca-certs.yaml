@@ -1,0 +1,15 @@
+{{ if .Values.deploymentConfig.sharedResources.enabled }}
+{{- if (((.Values.global).security).tls).enabled }}
+apiVersion: certm.sec.ericsson.com/v1
+kind: ExternalCertificate
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-trusted-ca-certs
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+spec:
+  generated-secret-name: {{ template "eric-cbrs-dc.name" . }}-trusted-ca-certs
+  generated-secret-type: opaque
+  trusted-certificates-file-name: {{ (.Values.externalCertificateTrustedCaCerts.certificates).trustedCertificatesFileName }}
+  trusted-certificate-list-name: {{ (.Values.externalCertificateTrustedCaCerts.certificates).trustedCertificateListName }}
+{{- end }}
+{{- end }}

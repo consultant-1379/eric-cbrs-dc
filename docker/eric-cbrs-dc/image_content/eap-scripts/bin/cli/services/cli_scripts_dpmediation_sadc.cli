@@ -1,0 +1,17 @@
+if (result == "tls" && outcome == "success") of /:resolve-expression(expression="${CONNECT_MODE}")
+  echo "/subsystem=elytron/key-store=tlsKeyStore/:add"
+  /subsystem=elytron/key-store=tlsKeyStore/:add(credential-reference={clear-text=3ric550N},path=/ericsson/cbrs-dc-sa/keystore/cbrs-dc-sa-keystore.jks,required=false,type=JKS)
+  echo "/subsystem=elytron/key-store=tlsTrustStore/:add"
+  /subsystem=elytron/key-store=tlsTrustStore/:add(credential-reference={clear-text=3ric550N},path=/ericsson/cbrs-dc-sa/truststore/cbrs-dc-sa-truststore.jks,required=false,type=JKS)
+  echo "/subsystem=elytron/key-manager=tlsKeyManager/:add"
+  /subsystem=elytron/key-manager=tlsKeyManager/:add(credential-reference={clear-text=3ric550N},key-store=tlsKeyStore,algorithm=SunX509)
+  echo "/subsystem=elytron/trust-manager=tlsTrustManager/:add"
+  /subsystem=elytron/trust-manager=tlsTrustManager/:add(key-store=tlsTrustStore,algorithm=SunX509)
+  echo "/subsystem=elytron/server-ssl-context=twoWaySSC/:add"
+  /subsystem=elytron/server-ssl-context=twoWaySSC/:add(key-manager=tlsKeyManager,need-client-auth=true,protocols=["TLSv1.2"],trust-manager=tlsTrustManager)
+
+  echo "/subsystem=undertow/server=default-server/https-listener=default/:add"
+  /subsystem=undertow/server=default-server/https-listener=https/:add(ssl-context=twoWaySSC,socket-binding=https)
+else
+  echo "CONNECT_MODE not set to tls, nothing to do"
+end-if

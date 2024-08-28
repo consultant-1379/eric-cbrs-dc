@@ -1,0 +1,14 @@
+{{- if .Values.deploymentConfig.deploymentResources.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "eric-cbrs-dc.deploymentName" . }}
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+spec:
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "eric-cbrs-dc.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+{{- end }}

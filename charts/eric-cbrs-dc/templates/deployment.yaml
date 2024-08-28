@@ -1,0 +1,447 @@
+{{ if .Values.deploymentConfig.deploymentResources.enabled }}
+{{- $g := fromJson (include "eric-cbrs-dc.global" .) -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "eric-cbrs-dc.deploymentName" . }}
+  labels: {{- include "eric-cbrs-dc.deployment-labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "eric-cbrs-dc.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  strategy:
+    type: {{ .Values.updateStrategy.type }}
+    {{- if and (eq .Values.updateStrategy.type "RollingUpdate") .Values.updateStrategy.rollingUpdate }}
+    rollingUpdate:
+      {{- if .Values.updateStrategy.rollingUpdate.maxUnavailable }}
+      maxUnavailable: {{ .Values.updateStrategy.rollingUpdate.maxUnavailable }}
+      {{- end }}
+      {{- if .Values.updateStrategy.rollingUpdate.maxSurge }}
+      maxSurge: {{ .Values.updateStrategy.rollingUpdate.maxSurge }}
+      {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      labels: {{- include "eric-cbrs-dc.deployment-labels" . | nindent 8 }}
+      annotations: {{- $default := include "eric-cbrs-dc.annotations" . | fromYaml -}}
+  {{  $appArmor := include "eric-cbrs-dc.appArmorAnnotations" . | fromYaml -}}
+  {{  include "eric-cbrs-dc.mergeAnnotations" (dict "location" .Template.Name "sources" (list $appArmor $default)) | trim | nindent 8}}
+  {{- if or (eq (((.Values).global).log).streamingMethod "direct") (eq (((.Values).global).log).streamingMethod "dual") }}
+  {{- include "eric-log-shipper-sidecar.LsAppArmorProfileAnnotation" . | indent 8 }}
+  {{- end }}
+    spec:
+      {{- if (.Values.podPriority).priorityClassName }}
+      priorityClassName: {{ .Values.podPriority.priorityClassName | quote }}
+      {{- end }}
+      {{- if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints: {{- include "eric-cbrs-dc.topologySpreadConstraints" . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "eric-cbrs-dc.sharedNameReference" . }}
+      initContainers:
+      {{- if .Values.resources.initcontainerService.enabled }}
+      - name: {{ include "eric-cbrs-dc.name" . }}-init-service
+        image: {{ template "eric-cbrs-dc.initImagePath" . }}
+        imagePullPolicy: {{ template "eric-cbrs-dc.initImage.registryImagePullPolicy" . }}
+        command: [ '/bin/sh', '-c', 'bash /var/tmp/check_service.sh -s {{ .Values.techDebt.enmProperties.postgres_service }}' ]
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: false
+          capabilities:
+            drop:
+            - all
+          {{- if (index (.Values.seccompProfile) "eric-cbrs-dc-init-service").type -}}
+          {{  include "eric-cbrs-dc.seccompProfile" (index .Values "seccompProfile" "eric-cbrs-dc-init-service") | nindent 10 }}
+          {{- end }}
+        resources:
+          requests:
+          {{- if .Values.resources.initcontainerService.requests.cpu }}
+            cpu: {{ .Values.resources.initcontainerService.requests.cpu | quote }}
+          {{- end }}
+          {{- if .Values.resources.initcontainerService.requests.memory }}
+            memory: {{ .Values.resources.initcontainerService.requests.memory | quote }}
+          {{- end }}
+          {{- if (index .Values "resources" "initcontainerService" "requests" "ephemeral-storage") }}
+          {{ println "  ephemeral-storage:" (index .Values "resources" "initcontainerService" "requests" "ephemeral-storage" | quote) }}
+          {{- end }}
+          limits:
+          {{- if .Values.resources.initcontainerService.limits.cpu }}
+            cpu: {{ .Values.resources.initcontainerService.limits.cpu | quote }}
+          {{- end }}
+          {{- if .Values.resources.initcontainerService.limits.memory }}
+            memory: {{ .Values.resources.initcontainerService.limits.memory | quote }}
+          {{- end }}
+          {{- if (index .Values "resources" "initcontainerService" "limits" "ephemeral-storage") }}
+          {{ println "  ephemeral-storage:" (index .Values "resources" "initcontainerService" "limits" "ephemeral-storage" | quote) }}
+          {{- end }}
+        env:
+        {{- if (.Values.global).timezone }}
+        - name: TZ
+          value: {{ .Values.global.timezone | quote }}
+        {{- end }}
+      {{- end }}
+      - name: {{ include "eric-cbrs-dc.name" . }}-init-sfwkdb
+        image: {{ template "eric-cbrs-dc.initImagePath" . }}
+        imagePullPolicy: {{ template "eric-cbrs-dc.initImage.registryImagePullPolicy" . }}
+        command: [ '/bin/sh', '-c', 'bash /var/tmp/sfwkdb_config.sh' ]
+        securityContext:
+          allowPrivilegeEscalation: true
+          privileged: true
+          readOnlyRootFilesystem: false
+          runAsNonRoot: false
+          capabilities:
+            drop:
+            - all
+          {{- if (index (.Values.seccompProfile) "eric-cbrs-dc-init-sfwkdb").type  -}}
+          {{  include "eric-cbrs-dc.seccompProfile" (index .Values "seccompProfile" "eric-cbrs-dc-init-sfwkdb") | nindent 10 }}
+          {{- end }}
+        resources:
+          requests:
+          {{- if .Values.resources.initcontainerSfwkdb.requests.cpu }}
+            cpu: {{ .Values.resources.initcontainerSfwkdb.requests.cpu | quote }}
+          {{- end }}
+          {{- if .Values.resources.initcontainerSfwkdb.requests.memory }}
+            memory: {{ .Values.resources.initcontainerSfwkdb.requests.memory | quote }}
+          {{- end }}
+          {{- if (index .Values "resources" "initcontainerSfwkdb" "requests" "ephemeral-storage") }}
+          {{ println "  ephemeral-storage:" (index .Values "resources" "initcontainerSfwkdb" "requests" "ephemeral-storage" | quote) }}
+          {{- end }}
+          limits:
+          {{- if .Values.resources.initcontainerSfwkdb.limits.cpu }}
+            cpu: {{ .Values.resources.initcontainerSfwkdb.limits.cpu | quote }}
+          {{- end }}
+          {{- if .Values.resources.initcontainerSfwkdb.limits.memory }}
+            memory: {{ .Values.resources.initcontainerSfwkdb.limits.memory | quote }}
+          {{- end }}
+          {{- if (index .Values "resources" "initcontainerSfwkdb" "limits" "ephemeral-storage") }}
+          {{ println "  ephemeral-storage:" (index .Values "resources" "initcontainerSfwkdb" "limits" "ephemeral-storage" | quote) }}
+          {{- end }}
+        env:
+        {{- if (.Values.global).timezone }}
+        - name: TZ
+          value: {{ .Values.global.timezone | quote }}
+        {{- end }}
+        - name: POSTGRES_SERVICE
+          value: {{ .Values.techDebt.enmProperties.postgres_service }}
+        volumeMounts:
+        - name: gp-pg-pass
+          mountPath: /ericsson/tor/data/global.properties
+          subPath: global.properties
+        - name: pg-key
+          mountPath: /ericsson/tor/data/idenmgmt/postgresql01_passkey
+          subPath: postgresql01_passkey
+      containers:
+      - name: {{ include "eric-cbrs-dc.name" . }}
+        image: {{ template "eric-cbrs-dc.mainImagePath" . }}
+        securityContext:
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          capabilities:
+            add:
+            - CHOWN
+            - DAC_OVERRIDE
+            - FSETID
+            - FOWNER
+            drop:
+            - all
+          {{-  if (index (.Values.seccompProfile) "eric-cbrs-dc").type -}}
+          {{-  include "eric-cbrs-dc.seccompProfile" (index .Values "seccompProfile" "eric-cbrs-dc") | nindent 10 }}
+          {{-  end }}
+        imagePullPolicy: {{ template "eric-cbrs-dc.mainImage.registryImagePullPolicy" . }}
+        resources:
+          requests:
+          {{- if .Values.resources.maincontainer.requests.cpu }}
+            cpu: {{ .Values.resources.maincontainer.requests.cpu | quote }}
+          {{- end }}
+          {{- if .Values.resources.maincontainer.requests.memory }}
+            memory: {{ .Values.resources.maincontainer.requests.memory | quote }}
+          {{- end }}
+          {{- if (index .Values "resources" "maincontainer" "requests" "ephemeral-storage") }}
+          {{ println "  ephemeral-storage:" (index .Values "resources" "maincontainer" "requests" "ephemeral-storage" | quote) }}
+          {{- end }}
+          limits:
+          {{- if .Values.resources.maincontainer.limits.cpu }}
+            cpu: {{ .Values.resources.maincontainer.limits.cpu | quote }}
+          {{- end }}
+          {{- if .Values.resources.maincontainer.limits.memory }}
+            memory: {{ .Values.resources.maincontainer.limits.memory | quote }}
+          {{- end }}
+          {{- if (index .Values "resources" "maincontainer" "limits" "ephemeral-storage") }}
+          {{ println "  ephemeral-storage:" (index .Values "resources" "maincontainer" "limits" "ephemeral-storage" | quote) }}
+          {{- end }}
+        env:
+        - name: KUBERNETES_VERSION
+          value: {{ .Capabilities.KubeVersion }}
+        - name: PRODUCT_NUMBER
+          value: {{ include "eric-cbrs-dc.product-image-number" . }}
+        - name: PRODUCT_RSTATE
+          value: {{ include "eric-cbrs-dc.product-image-rState" . }}
+        {{- if (.Values.global).timezone }}
+        - name: TZ
+          value: {{ .Values.global.timezone | quote }}
+        {{- end }}
+        {{- if (((.Values.global).security).tls).enabled }}
+        # This env variable is used by cli_scripts_dpmediation_sadc.cli to configure JBoss for TLS
+        - name: CONNECT_MODE
+          value: "tls"
+        {{- if (eq .Values.service.endpoints.restapi.tls.enforced "required") }}
+        - name: TLS_MODE
+          value: "only_tls"
+        {{- end }}
+        {{- end }}
+        - name: DC_AKKA_DNS_NAME
+          value: {{ include "eric-cbrs-dc.sharedNameReference" . }}-akka
+        - name: JBOSS_LOG_LEVEL
+          value: {{ .Values.jbossLogging.level }}
+        - name: JBOSS_LOG_DIR
+          value: {{ .Values.jbossLogging.directory }}
+        - name: ENM_JBOSS_BIND_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: dcmHost
+          value: "eric-cbrs-dc-dcm"
+        - name: CBRS_LOAD_BALANCER_IP
+          valueFrom:
+            configMapKeyRef:
+              name: {{ template "eric-cbrs-dc.sharedNameReference" . }}-load-balancer-ip
+              key: CBRS_LOAD_BALANCER_IP
+        {{- if .Values.techDebt.enmProperties.postgres_service }}
+        - name: POSTGRES_SERVICE
+          value: {{ .Values.techDebt.enmProperties.postgres_service }}
+        {{- end }}
+        {{- if (((.Values.global).security).tls).enabled }}
+        - name: TRUSTED_CERTIFICATES_FILE_NAME
+          value: {{ (.Values.externalCertificateTrustedCaCerts.certificates).trustedCertificatesFileName }}
+        - name: TRUSTED_CERTIFICATES_LIST_NAME
+          value: {{ (.Values.externalCertificateTrustedCaCerts.certificates).trustedCertificateListName }}
+        {{- end }}
+        - name: ALARM_HANDLER_HOSTNAME
+          value: {{ .Values.service.alarmHandler.hostname }}
+        - name: ALARM_HANDLER_PORT
+          value: {{ .Values.service.alarmHandler.port | quote }}
+        - name: ALARM_HANDLER_PATH
+          value: {{ .Values.service.alarmHandler.path }}
+        - name: DCM_TRUSTSTORE_FILE_PATH
+          value: {{.Values.service.dcm.truststore}}
+        - name: DCM_KEYSTORE_FILE_PATH
+          value: {{.Values.service.dcm.keystore}}
+        ports:
+        - name: ingress-port
+        {{- if (((.Values.global).security).tls).enabled }}
+          containerPort: {{ .Values.service.ingressPort }}
+        {{- else }}
+          containerPort: {{ .Values.service.jbossPort }}
+        {{- end }}
+        - name: jboss-port
+          containerPort: {{ .Values.service.jbossPort }}
+        - name: akka-mgmt-port
+          containerPort: {{ .Values.service.akkaManagementPort }}
+        - name: http-metrics
+          containerPort: {{ .Values.service.metricsPort }}
+        - name: akka-probe-port
+          containerPort: {{ .Values.service.akkaProbingPort }}
+        startupProbe:
+          exec:
+            command:
+            - /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+            - --exec_agents
+{{ toYaml (index .Values "probes" "maincontainer" "startupProbe") | indent 10 }}
+        livenessProbe:
+          exec:
+            command:
+            - /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+            - --exec_agents
+{{ toYaml (index .Values "probes" "maincontainer" "livenessProbe") | indent 10 }}
+        readinessProbe:
+          exec:
+            command:
+            - /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+            - --exec_agents
+{{ toYaml (index .Values "probes" "maincontainer" "readinessProbe") | indent 10 }}
+        volumeMounts:
+        - name: gp
+          mountPath: /gp
+        - name: gp-pg-pass
+          mountPath: /ericsson/tor/data/global.properties
+          subPath: global.properties
+        - name: pg-key
+          mountPath: /ericsson/tor/data/idenmgmt/postgresql01_passkey
+          subPath: postgresql01_passkey
+{{- if or (eq (((.Values).global).log).streamingMethod "direct") (eq (((.Values).global).log).streamingMethod "dual") }}
+{{- include "eric-log-shipper-sidecar.log-shipper-sidecar-mounts" . | indent 8 }}
+{{- end }}
+        {{- if (((.Values.global).security).tls).enabled }}
+        - name: enm-tls-certificate-and-key-secret
+          mountPath: /ericsson/cbrs-dc-sa/certificates/enm
+          readOnly: true
+        - name: trusted-enm-ca-certs
+          mountPath: /ericsson/cbrs-dc-sa/certificates/enm/cacerts
+          readOnly: true
+        - name: cbrs-dcsa-sas-key
+          mountPath: /ericsson/cbrs-dc-sa/dc-sas/keys/
+          readOnly: true
+        - name: cbrs-dcsa-sas-truststore
+          mountPath: /ericsson/cbrs-dc-sa/dc-sas/truststore/
+          readOnly: true
+        - name: alarm-handler-client-certs
+          mountPath: /ericsson/cbrs-dc-sa/certificates/alarmhandler
+          readOnly: true
+        - name: sip-tls-root-ca-volume
+          mountPath: /ericsson/cbrs-dc-sa/certificates/sip-tls-root-ca
+          readOnly: true
+        {{- end }}
+      - name: {{ include "eric-cbrs-dc.name" . }}-monitoring
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - all
+          {{- if (index (.Values.seccompProfile) "eric-cbrs-dc-monitoring").type -}}
+          {{- include "eric-cbrs-dc.seccompProfile" (index .Values "seccompProfile" "eric-cbrs-dc-monitoring") | nindent 10 }}
+          {{- end }}
+        image: {{ template "eric-cbrs-dc.monitoringImagePath" . }}
+        imagePullPolicy: {{ template "eric-cbrs-dc.monitoringImage.registryImagePullPolicy" . }}
+        env:
+        - name: SERVICENAME
+          value: {{ include "eric-cbrs-dc.sharedNameReference" . }}
+        - name: SGNAME
+          value: {{ .Values.techDebt.sgName }}
+        {{- if (.Values.global).timezone }}
+        - name: TZ
+          value: {{ .Values.global.timezone | quote }}
+        {{- end }}
+        {{- if index .Values "monitoring" }}
+        {{- if index .Values "monitoring" "jmx_service_url"}}
+        - name: JMX_SERVICE_URL
+          value: {{ .Values.monitoring.jmx_service_url }}
+        {{- end }}
+        {{- if index .Values "monitoring" "e2e_jvm_id"}}
+        - name: E2E_JVM_ID
+          value: {{ .Values.monitoring.e2e_jvm_id }}
+        {{- end }}
+        {{- end }}
+        volumeMounts:
+          - name: jboss-cred-volume
+            mountPath: /run/secrets/jboss-creds
+            readOnly: true
+        startupProbe:
+          tcpSocket:
+            port: 9600
+{{ toYaml (index .Values "probes" "monitoringcontainer" "startupProbe") | indent 10 }}
+        livenessProbe:
+          tcpSocket:
+            port: 9600
+{{ toYaml (index .Values "probes" "monitoringcontainer" "livenessProbe") | indent 10 }}
+        readinessProbe:
+          tcpSocket:
+            port: 9600
+{{ toYaml (index .Values "probes" "monitoringcontainer" "readinessProbe") | indent 10 }}
+        resources:
+          requests:
+          {{- if .Values.resources.monitoringcontainer.requests.cpu }}
+            cpu: {{ .Values.resources.monitoringcontainer.requests.cpu | quote }}
+          {{- end }}
+          {{- if .Values.resources.monitoringcontainer.requests.memory }}
+            memory: {{ .Values.resources.monitoringcontainer.requests.memory | quote }}
+          {{- end }}
+          {{- if (index .Values "resources" "monitoringcontainer" "requests" "ephemeral-storage") }}
+          {{ println "  ephemeral-storage:" (index .Values "resources" "monitoringcontainer" "requests" "ephemeral-storage" | quote) }}
+          {{- end }}
+          limits:
+          {{- if .Values.resources.monitoringcontainer.limits.cpu }}
+            cpu: {{ .Values.resources.monitoringcontainer.limits.cpu | quote }}
+          {{- end }}
+          {{- if .Values.resources.monitoringcontainer.limits.memory }}
+            memory: {{ .Values.resources.monitoringcontainer.limits.memory | quote }}
+          {{- end }}
+          {{- if (index .Values "resources" "monitoringcontainer" "limits" "ephemeral-storage") }}
+          {{ println "  ephemeral-storage:" (index .Values "resources" "monitoringcontainer" "limits" "ephemeral-storage" | quote) }}
+          {{- end }}
+  {{- if or (eq (((.Values).global).log).streamingMethod "direct") (eq (((.Values).global).log).streamingMethod "dual") }}
+  {{- $logshipperImageDict := dict "logshipperSidecarImage" ((((.Values).global).logShipper).config).image -}}
+  {{- include "eric-log-shipper-sidecar.log-shipper-sidecar-container" (mergeOverwrite . $logshipperImageDict ) | indent 6 }}
+  {{- end }}
+      volumes:
+        - name: gp
+          configMap:
+            name: {{ include "eric-cbrs-dc.sharedNameReference" . }}-gp
+        - name: gp-pg-pass
+          configMap:
+            name: {{ include "eric-cbrs-dc.sharedNameReference" . }}-gp-pg-pass
+        - name: pg-key
+          configMap:
+            name: {{ include "eric-cbrs-dc.sharedNameReference" . }}-pg-key
+            defaultMode: 0644
+        - name: jboss-cred-volume
+          secret:
+            secretName: {{ template "eric-cbrs-dc.name" . }}-jboss-secret
+{{- if or (eq (((.Values).global).log).streamingMethod "direct") (eq (((.Values).global).log).streamingMethod "dual") }}
+{{- include "eric-log-shipper-sidecar.log-shipper-sidecar-volumes" . | indent 8 }}
+{{- end }}
+        {{- if (((.Values.global).security).tls).enabled }}
+        - name: enm-tls-certificate-and-key-secret
+          secret:
+            secretName: {{ template "eric-cbrs-dc.sharedNameReference" . }}-server-tls-certificate-and-key
+        - name: trusted-enm-ca-certs
+          secret:
+            secretName: {{ template "eric-cbrs-dc.sharedNameReference" . }}-trusted-ca-certs
+        - name: cbrs-dcsa-sas-key
+          secret:
+            secretName: {{ template "eric-cbrs-dc.sharedNameReference" . }}-cbrs-dcsa-sas-key
+        - name: cbrs-dcsa-sas-truststore
+          secret:
+            secretName: {{ template "eric-cbrs-dc.sharedNameReference" . }}-cbrs-dcsa-sas-truststore
+        - name: alarm-handler-client-certs
+          secret:
+            secretName: {{ template "eric-cbrs-dc.sharedNameReference" . }}-alarm-handler-client-cert
+        - name: sip-tls-root-ca-volume
+          secret:
+            secretName: {{ .Values.service.alarmHandler.certificateAuthority }}
+        {{- end }}
+      {{- if include "eric-cbrs-dc.pullSecrets" . }}
+      imagePullSecrets:
+        - name: {{ template "eric-cbrs-dc.pullSecrets" . }}
+      {{- end }}
+      {{- if (or .Values.nodeSelector $g.nodeSelector) }}
+      nodeSelector: {{- include "eric-cbrs-dc.nodeSelector" . | nindent 8 }}
+      {{- end }}
+      {{- if eq .Values.affinity.podAntiAffinity "hard" }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: ericsson.com/eric-cbrs-dc
+                operator: In
+                values:
+                - {{ include "eric-cbrs-dc.sharedNameReference" . }}
+            topologyKey: {{ .Values.affinity.topologyKey }}
+      {{- else if eq .Values.affinity.podAntiAffinity  "soft" }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: ericsson.com/eric-cbrs-dc
+                  operator: In
+                  values:
+                  - {{ include "eric-cbrs-dc.sharedNameReference" . }}
+              topologyKey: {{ .Values.affinity.topologyKey }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+{{- end }}

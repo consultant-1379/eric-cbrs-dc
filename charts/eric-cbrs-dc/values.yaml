@@ -1,0 +1,313 @@
+## eric-cbrs-dc image version
+
+# global:
+  # pullSecret:
+  # registry:
+    # url: armdocker.rnd.ericsson.se
+    # repoPath:
+  # timezone: UTC
+  # security:
+    # tls:
+      # enabled: false
+
+# TODO: Remove these...should use source of truth in eric-product-info.yaml
+productNumber: CXC 174 2027
+productRevision: RSTATE
+
+deploymentConfig:
+  sharedResources:
+    enabled: true
+  deploymentResources:
+    enabled: true
+    nameSuffix:
+    sharedResourcesName:
+
+DCM_HOST:
+
+CBRS_LOAD_BALANCER:
+  loadBalancerIP:
+
+jbossLogging:
+  level: INFO
+  directory: "/logs"
+
+techDebt:
+  sgName: dpmediation
+  enmProperties:
+    postgres_service: eric-data-document-database-pg
+    postgresql01_admin_password:
+
+imageCredentials:
+  # repoPath include the image path relative to the registry url, excluding image name
+  mainImage:
+    repoPath: # see default in eric-product-info.yaml
+    registry:
+      # overrides global registry url
+      #url: armdocker.companyA.se
+  initImage:
+    repoPath: # see default in eric-product-info.yaml
+    registry: {}
+      # overrides global registry url
+      #url: armdocker.companyA.se
+  monitoringImage:
+    repoPath: # see default in eric-product-info.yaml
+    registry: {}
+      # overrides global registry url
+      #url: armdocker.companyA.se
+  # Secret must be manually created in the namespace, no default value
+  #pullSecret: eric-cbrs-dc-secret
+  logshipper:
+    registry:
+      url:
+      imagePullPolicy:
+    repoPath: proj-adp-log-released
+
+# Number of replicas(pods) to deploy
+replicaCount: 2
+
+## Pod Disruption Budget is an indicator of the number of disruptions that can be tolerated at a given time.
+podDisruptionBudget:
+  maxUnavailable: 1
+
+## Affinity for pod assignment
+affinity:
+  podAntiAffinity: "hard"
+  topologyKey: "kubernetes.io/hostname"
+
+## Tolerations for pod assignment
+tolerations: []
+
+# Extra Annotations to be added to pod
+annotations: {}
+
+# Extra Annotations to be added to pod
+labels: {}
+
+endpointSlice:
+  labels:
+    - 'kubernetes.io/service-name: eric-cbrs-dc-dcm'
+## Configure the service
+service:
+  jbossPort: 8080
+  jbossInternalPort: 8081
+  metricsPort: 9600
+  akkaManagementPort: 8558
+  akkaProbingPort: 25520
+  postgresDbPort: 5432
+  ingressPort: 8443
+  dcmPort: 43340
+  dcmSecurePort: 43341
+  basebandPort: 6513
+  securelogTransformerPort: 9443
+  logTransformerPort: 5044
+  dnsPort: 53
+  kubernetesApiPort: 6443
+  dcm:
+    truststore: "/ericsson/cbrs-dc-sa/truststore/cbrs-dc-sa-truststore.jks"
+    keystore: "/ericsson/cbrs-dc-sa/keystore/cbrs-dc-sa-keystore.jks"
+  internalService:
+    type: ClusterIP
+  externalService:
+    enabled: false
+    type: LoadBalancer
+    loadBalancerIP:
+    annotations:
+      cloudProviderLB: {}
+      sharedVIPLabel:
+      addressPoolName:
+    externalIPv4:
+      enabled:
+      loadBalancerIP:
+      annotations:
+        cloudProviderLB: {}
+        sharedVIPLabel:
+        addressPoolName:
+    externalIPv6:
+      enabled:
+      loadBalancerIP:
+      annotations:
+        cloudProviderLB: {}
+        sharedVIPLabel:
+        addressPoolName:
+  endpoints:
+    restapi:
+      tls:
+        enforced: required
+  alarmHandler:
+    hostname: "eric-fh-alarm-handler"
+    port: 5006
+    path: "/ah/api/v0/alarms?outputFormat=FullAlarmList"
+    certificateAuthority: "eric-sec-sip-tls-trusted-root-cert"
+
+networkPolicy:
+  enabled: true
+  sasPort:
+  accessLabels:
+    - '{{ .Values.techDebt.enmProperties.postgres_service }}-access: "true"'
+    - '{{ .Values.service.alarmHandler.hostname }}-access: "true"'
+    - '{{ .Values.logShipper.output.logTransformer.host }}-access: "true"'
+
+resources:
+  maincontainer:
+    requests:
+      memory: 4096Mi
+      cpu: 2000m
+    limits:
+      memory: 4096Mi
+      cpu: 2000m
+  initcontainerService:
+    enabled: true
+    requests:
+      memory: 500Mi
+      cpu: 1000m
+    limits:
+      memory: 500Mi
+      cpu: 1000m
+  initcontainerSfwkdb:
+    requests:
+      memory: 800Mi
+      cpu: 1000m
+    limits:
+      memory: 800Mi
+      cpu: 1000m
+  monitoringcontainer:
+    requests:
+      memory: 300Mi
+      cpu: 1000m
+    limits:
+      memory: 300Mi
+      cpu: 1000m
+  logshipper:
+    requests:
+      memory: "50Mi"
+      cpu: "50m"
+    limits:
+      memory: "100Mi"
+      cpu: "100m"
+
+
+probes:
+  maincontainer:
+    # StartupProbe Health Check configuration.
+    startupProbe:
+      initialDelaySeconds: 10
+      timeoutSeconds: 30
+      periodSeconds: 30
+      failureThreshold: 20
+    # LivenessProbe Health Check configuration.
+    livenessProbe:
+      initialDelaySeconds: 30
+      timeoutSeconds: 30
+      periodSeconds: 30
+      failureThreshold: 2
+    # ReadinessProbe Health Check configuration.
+    readinessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 30
+      failureThreshold: 2
+  monitoringcontainer:
+    # StartupProbe Health Check configuration.
+    startupProbe:
+      initialDelaySeconds: 10
+      timeoutSeconds: 30
+      periodSeconds: 30
+      failureThreshold: 20
+    # LivenessProbe Health Check configuration.
+    livenessProbe:
+      initialDelaySeconds: 30
+      timeoutSeconds: 30
+      periodSeconds: 30
+      failureThreshold: 2
+    # ReadinessProbe Health Check configuration.
+    readinessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 30
+      failureThreshold: 1
+  logshipper:
+    livenessProbe:
+      initialDelaySeconds: 1
+      timeoutSeconds: 10
+      periodSeconds: 10
+      failureThreshold: 3
+
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: "0"
+
+ingress:
+  enabled: true
+  hostname:
+  ingressClass: cbrs-ingress-nginx
+  ingressController:
+    podName: cbrs-ingress-controller-nx
+
+externalCertificateMTLS:
+  certificates:
+    asymmetricKeyCertificateName: cbrs-dc-sa-enm
+    trustedCertificateListName: cbrs-dc-sa-enm
+
+externalCertificateTrustedCaCerts:
+  certificates:
+    trustedCertificatesFileName: caCerts
+    trustedCertificateListName: cbrsPubsDcSaEnmCaCerts
+
+topologySpreadConstraints: [ ]
+
+terminationGracePeriodSeconds: 30
+
+podPriority:
+  priorityClassName: ""
+
+nodeSelector: {}
+
+logShipper:
+  logLevel: info
+  runAndExit: false
+  shutdownDelay: 10
+  multilines:
+    - name: "dc_multiline"
+      start:
+        pattern: ^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}|^\d{2}:\d{2}:\d{2},\d{3}
+        next: "cont1"
+      cont:
+        - name: "cont1"
+          pattern: (^[[:space:]]|^$|^[A-Za-z]|^\'|^\*)
+          next: "cont1"
+  input:
+    files:
+      - enabled: true
+        paths:
+          - "server.log"
+          - "messages"
+        multilines:
+          - "dc_multiline"
+  storage:
+    path: "/logs"
+    size: "400Mi"
+  output:
+    logTransformer:
+      host: eric-log-transformer
+
+appArmorProfile:
+  eric-cbrs-dc:
+    type: ""
+
+  eric-cbrs-dc-monitoring:
+    type: ""
+
+seccompProfile:
+  eric-cbrs-dc:
+    type: ""
+
+  eric-cbrs-dc-monitoring:
+    type: ""
+
+  eric-cbrs-dc-init-service:
+    type: ""
+
+  eric-cbrs-dc-init-sfwkdb:
+    type: ""

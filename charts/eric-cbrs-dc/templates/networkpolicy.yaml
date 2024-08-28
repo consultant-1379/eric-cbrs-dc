@@ -1,0 +1,96 @@
+{{- if .Values.global -}}
+{{- if and .Values.global.networkPolicy .Values.networkPolicy -}}
+{{- if and .Values.global.networkPolicy.enabled .Values.networkPolicy.enabled -}}
+{{- if .Values.deploymentConfig.sharedResources.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      ericsson.com/eric-cbrs-dc: {{ include "eric-cbrs-dc.name" . }}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: eric-pm-server
+    ports:
+    - protocol: TCP
+      port: {{ .Values.service.metricsPort }}
+  - from:
+    - podSelector:
+        matchLabels:
+          ericsson.com/eric-cbrs-dc: {{ include "eric-cbrs-dc.name" . }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.service.akkaProbingPort }}
+    - protocol: TCP
+      port: {{ .Values.service.akkaManagementPort }}
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: {{ .Values.ingress.ingressController.podName }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.service.ingressPort }}
+  - ports:
+    - port: {{ .Values.service.jbossPort }}
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+           app.kubernetes.io/name: {{ .Values.techDebt.enmProperties.postgres_service }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.service.postgresDbPort }}
+  - to:
+    - podSelector:
+        matchLabels:
+           app.kubernetes.io/name: eric-log-transformer
+    ports:
+    - protocol: TCP
+      port: {{ .Values.service.securelogTransformerPort }}
+    - protocol: TCP
+      port: {{ .Values.service.logTransformerPort }}
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: {{ .Values.service.alarmHandler.hostname }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.service.alarmHandler.port }}
+  - to:
+    - podSelector:
+        matchLabels:
+          ericsson.com/eric-cbrs-dc: {{ include "eric-cbrs-dc.name" . }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.service.akkaProbingPort }}
+    - protocol: TCP
+      port: {{ .Values.service.akkaManagementPort }}
+  - to:
+    ports:
+    - protocol: UDP
+      port: {{ .Values.service.dnsPort }}
+    - protocol: TCP
+      port: {{ .Values.service.dnsPort }}
+    - protocol: TCP
+      port: {{ .Values.service.kubernetesApiPort }}
+    - protocol: TCP
+      port: {{ .Values.service.basebandPort }}
+    - protocol: TCP
+      port: {{ .Values.service.dcmPort }}
+    - protocol: TCP
+      port: {{ .Values.networkPolicy.sasPort }}
+    - protocol: TCP
+      port: {{ .Values.service.dcmSecurePort }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

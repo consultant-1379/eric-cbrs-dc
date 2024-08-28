@@ -1,0 +1,58 @@
+{{- if .Values.deploymentConfig.sharedResources.enabled }}
+# This is a headless service which is used to send alarms from DC SA to DCM where
+# DCM can either be ipv4 or ipv6 or the staging service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-dcm
+  labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  {{- if or (contains ":" .Values.DCM_HOST) (contains "." .Values.DCM_HOST) }}
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.dcmSecurePort }}
+      targetPort: dcm-secure-port
+  {{- else }}
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.dcmPort }}
+      targetPort: dcm-port
+  {{- end }}
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-dcm-1
+  labels: {{- include "eric-cbrs-dc.headless-service-labels" . | nindent 4 }}
+  annotations: {{- include "eric-cbrs-dc.annotations" . | nindent 4 }}
+{{- if contains ":" .Values.DCM_HOST }}
+addressType: IPv6
+{{- else if contains "." .Values.DCM_HOST }}
+addressType: IPv4
+{{- else }}
+addressType: FQDN
+{{- end }}
+{{- if or (contains ":" .Values.DCM_HOST) (contains "." .Values.DCM_HOST) }}
+ports:
+  - name: secure
+    appProtocol: https
+    protocol: TCP
+    port: {{ .Values.service.dcmSecurePort }}
+endpoints:
+  - addresses:
+      - {{ .Values.DCM_HOST }}
+{{- else }}
+ports:
+  - name: unsecure
+    appProtocol: http
+    protocol: TCP
+    port: {{ .Values.service.dcmPort }}
+endpoints:
+  - addresses:
+      - {{ .Values.DCM_HOST }}.{{ .Release.Namespace | trim }}-test.svc.cluster.local
+{{- end }}
+{{- end }}

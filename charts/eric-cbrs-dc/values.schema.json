@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": true,
+  "type": "object",
+  "if": {
+    "properties": {
+      "deploymentConfig": {
+        "type": "object",
+        "properties": {
+          "sharedResources": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "DCM_HOST": {
+        "description": "IP address (IPv4 or IPv6) for the ENM Configuration Manager Virtual IP address.",
+        "type": "string",
+        "anyOf": [
+          {
+            "format": "ipv4"
+          },
+          {
+            "format": "ipv6"
+          },
+          {
+            "format": "hostname"
+          }
+        ]
+      }
+    },
+    "required": [
+      "DCM_HOST"
+    ],
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "sasPort": {
+          "type": "integer",
+          "description": "Sets the SAS HTTPS port to be used for egress from eric-cbrs-dc pod."
+        }
+      },
+      "required": [
+        "sasPort"
+      ]
+    },
+    "CBRS_LOAD_BALANCER": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "loadBalancerIP": {
+          "type": "string",
+          "anyOf": [
+            {
+              "format": "ipv4"
+            },
+            {
+              "format": "ipv6"
+            }
+          ],
+          "description": "Sets the IP address (IPv4 or IPv6) to be used in eric-cbrs-dc pod certificate alarms."
+        }
+      },
+      "required": [
+        "loadBalancerIP"
+      ]
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{{- if .Values.deploymentConfig.sharedResources.enabled }}
+{{- if (((.Values.global).security).policyBinding).create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+ name: {{ template "eric-cbrs-dc.name" . }}-security-policy
+ labels: {{- include "eric-cbrs-dc.labels" . | nindent 4 }}
+ annotations:
+  {{- $securityPolicy := include "eric-cbrs-dc.securityPolicy.annotations" . | fromYaml -}}
+  {{- $default := include "eric-cbrs-dc.annotations" . | fromYaml -}}
+  {{- include "eric-cbrs-dc.mergeAnnotations" (dict "location" .Template.Name "sources" (list $securityPolicy $default)) | trim | nindent 4 }}
+roleRef:
+ apiGroup: rbac.authorization.k8s.io
+ kind: ClusterRole
+ name: {{ include "eric-cbrs-dc.securityPolicy.reference" . }}
+subjects:
+ - kind: ServiceAccount
+   name: {{ template "eric-cbrs-dc.name" . }}
+{{- end -}}
+{{- end }}

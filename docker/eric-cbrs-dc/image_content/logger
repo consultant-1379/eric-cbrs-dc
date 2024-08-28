@@ -1,0 +1,74 @@
+#!/bin/bash
+###########################################################################
+#COPYRIGHT Ericsson 2022
+#
+# The copyright to the computer program(s) herein is the property of
+# Ericsson Inc. The programs may be used and/or copied only with written
+# permission from Ericsson Inc. or in accordance with the terms and
+# conditions stipulated in the agreement/contract under which the
+# program(s) have been supplied.
+###########################################################################
+
+#Default tag
+TAG="JBOSS"
+
+#Default priority
+PRIORITY=".info"
+
+# *******************************************************
+# Function Name: __printToFile
+# Description: Prints the given input to the messages file
+#              in JBOSS_LOG_DIR or to "/var/log/messages"
+#              if JBOSS_LOG_DIR does not exist.
+# GLOBALS:
+#   - JBOSS_LOG_DIR
+# ARGS:
+#   - $1, The log to printed to the messages file
+# RETURN:
+#   - 0 if successful
+#   - non-zero on error
+# *******************************************************
+__printToFile() {
+  echo "$1" >> "${JBOSS_LOG_DIR:-"/var/log"}"/messages
+}
+
+# *******************************************************
+# Function Name: __output
+# Description: Formats the logs to be printed, based on
+#              the arguments passed to the script.
+# GLOBALS:
+#   - JBOSS_LOG_DIR
+#   - HOSTNAME
+#   - TAG
+#   - PRIORITY
+# ARGS:
+#   - $1, The message to be added to the log.
+# RETURN:
+#   - 0 if successful
+#   - non-zero on error
+# *******************************************************
+__output() {
+  if [[ "$PRIORITY" == *".info"* ]]; then
+    LEVEL="INFO"
+  elif [[ "$PRIORITY" == *".err"* ]]; then
+    LEVEL="ERROR"
+  elif [[ "$PRIORITY" == *".warn"* ]]; then
+    LEVEL="WARN"
+  fi
+
+  __printToFile "$(date --rfc-3339='seconds') ${HOSTNAME} ${TAG:-JBOSS}: ${LEVEL} (): $1"
+}
+
+arg_array=( "$@" )
+index=0
+for arg in "${arg_array[@]}"
+do
+  index=$((index + 1))
+  if [ "$arg" == "-t" ]; then
+    TAG="${arg_array[index]}";
+  elif [ "$arg" == "-p" ]; then
+    PRIORITY="${arg_array[index]}";
+  fi
+done
+
+__output "${@: -1}"

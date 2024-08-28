@@ -1,0 +1,34 @@
+{{ if .Values.deploymentConfig.sharedResources.enabled }}
+{{ if (((.Values.global).security).tls).enabled }}
+apiVersion: siptls.sec.ericsson.com/v1
+kind: InternalCertificate
+metadata:
+  name: {{ template "eric-cbrs-dc.name" . }}-alarm-handler-client-cert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "eric-cbrs-dc.name" . }}
+    app.kubernetes.io/version: {{ include "eric-cbrs-dc.version" . }}
+    chart: {{ template "eric-cbrs-dc.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  {{ include "eric-cbrs-dc.config-labels" . | indent 4 }}
+  annotations:
+  {{ include "eric-cbrs-dc.product-info" . | indent 4 }}
+  {{ include "eric-cbrs-dc.config-annotations" . | indent 4 }}
+spec:
+  kubernetes:
+    generatedSecretName: {{ template "eric-cbrs-dc.name" . }}-alarm-handler-client-cert
+    certificateName: clicert.pem
+    privateKeyName: cliprivkey.pem
+  certificate:
+    subject:
+      cn: {{ template "eric-cbrs-dc.name" . }}
+    issuer:
+      reference: {{ .Values.service.alarmHandler.hostname }}-ca
+    subjectAlternativeName:
+      populateKubernetesDns: false
+    extendedKeyUsage:
+      tlsClientAuth: true
+      tlsServerAuth: false
+{{- end }}
+{{- end }}
